@@ -1,0 +1,151 @@
+---
+title: "Untitled"
+author: "Bowie Lam"
+date: "12/26/2020"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    keep_html: yes
+---
+
+```{r}
+# load packages
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr)
+library(ggplot2)
+library(readr)
+library(stringr)
+library(here)
+```
+
+```{r}
+# import data
+fires <- read.csv(here("raw_data", "mapdataall.csv"), na = "", stringsAsFactors = FALSE)
+```
+
+```{r}
+# view the structure of the data set
+str(fires)
+```
+
+```{r}
+# view a summary of the data set
+summary(fires)
+```
+
+```{r}
+# remove any duplicated rows
+fires <- fires[!duplicated(fires), ]
+```
+
+```{r}
+# display the proportion of missing data for each column
+pctmiss <- colSums(is.na(fires))/nrow(fires)
+round(pctmiss, 2)
+```
+
+```{r}
+# remove columns with a high proportion of missing data
+fires$incident_control <- NULL
+fires$incident_administrative_unit_url <- NULL
+fires$incident_type <- NULL
+
+# remove columns that are not needed/necessary for the purposes of this analysis
+fires$incident_location <- NULL
+fires$incident_id <- NULL
+fires$incident_date_extinguished <- NULL
+fires$notification_desired <- NULL
+fires$incident_is_final <- NULL
+fires$incident_url <- NULL
+fires$incident_date_last_update <- NULL
+fires$incident_date_created <- NULL
+fires$is_active <- NULL
+fires$calfire_incident <- NULL
+```
+
+### Inspecting Each Variable
+
+> In this section, each variable, or column, is inspected for any errors, anomalies, or other details worth knowing before producing a cleaned data set for analysis.
+
+#### variable(s): `incident_name`
+
+```{r}
+# trim any white space
+fires$incident_name <- trimws(fires$incident_name)
+
+# number of rows in the data set
+nrow(fires) # 1732
+
+# number of uniquely named rows in the data set
+fires %>% pull(incident_name) %>% unique() %>% length() # 1264
+```
+
+The data set has a total of 1,732 rows, but it has 1,264 uniquely named rows, thus indicating there are incidents with the same name, either because (1) they are the same incidents that occurred at different times, (2) unrelated incidents received the same name, or (3) some other explanation. This requires further exploration into the observations that share the same names.
+
+#### variable(s): `incident_dateonly_extinguished` and `incident_dateonly_created`
+
+```{r}
+# note: there is >= 1 observation that does not have data in the `incident_dateonly_extinguished` column
+# they're denoted by `NA`
+nrow(fires %>% filter(is.na(incident_dateonly_extinguished))) > 0
+```
+
+```{r}
+# note: there are no observations that do not have data in the `incident_dateonly_created` column; in other words, all observations have data in the `incident_dateonly_created` column
+nrow(fires %>% filter(is.na(incident_dateonly_created))) > 0
+```
+
+```{r}
+# separate the date data in `incident_dateonly_extinguished` into three individual columns
+fires <- separate(fires, "incident_dateonly_extinguished", c("extinguished_year", "extinguished_month", "extinguished_day"), sep = "-")
+
+# separate the date data in `incident_dateonly_created` into three individual columns
+fires <- separate(fires, "incident_dateonly_created", c("created_year", "created_month", "created_day"), sep = "-")
+```
+
+```{r}
+# remove leading zero (0) and convert from chr to num for columns `extinguished_month`, `extinguished_day`, `created_month`, and `created_day`
+fires$extinguished_month <- as.numeric(str_extract(fires$extinguished_month, "(?!0)[0-9]+"))
+fires$extinguished_day <- as.numeric(str_extract(fires$extinguished_day, "(?!0)[0-9]+"))
+fires$created_month <- as.numeric(str_extract(fires$created_month, "(?!0)[0-9]+"))
+fires$created_day <- as.numeric(str_extract(fires$created_day, "(?!0)[0-9]+"))
+
+# convert `extinguished_year` and `created_year` from chr to num
+fires$extinguished_year <- as.numeric(fires$extinguished_year)
+fires$created_year <- as.numeric(fires$created_year)
+```
+
+#### variable(s): `incident_administrative_unit`
+
+```{r}
+# trim any white space
+fires$incident_administrative_unit <- trimws(fires$incident_administrative_unit)
+```
+
+#### variable(s): `incident_county`
+
+```{r}
+# trim any white space
+fires$incident_county <- trimws(fires$incident_county)
+```
+
+#### variable(s): `incident_cooperating_agencies`
+
+```{r}
+# trim any white space
+fires$incident_cooperating_agencies <- trimws(fires$incident_cooperating_agencies)
+```
+
+```{r}
+str(fires)
+```
+
+```{r}
+fires
+```
+
+
+
+
+
