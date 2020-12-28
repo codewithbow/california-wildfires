@@ -62,6 +62,8 @@ fires$incident_date_last_update <- NULL
 fires$incident_date_created <- NULL
 fires$is_active <- NULL
 fires$calfire_incident <- NULL
+fires$incident_administrative_unit <- NULL
+fires$incident_cooperating_agencies <- NULL
 ```
 
 ### Inspecting Each Variable
@@ -83,7 +85,85 @@ fires %>% pull(incident_name) %>% unique() %>% length() # 1264
 
 The data set has a total of 1,732 rows, but it has 1,264 uniquely named rows, thus indicating there are incidents with the same name, either because (1) they are the same incidents that occurred at different times, (2) unrelated incidents received the same name, or (3) some other explanation. This requires further exploration into the observations that share the same names.
 
+```{r}
+# find the names of fires that occur more than once in the data set
+repeated_names <- fires %>% group_by(incident_name) %>% count() %>% arrange(desc(n)) %>% filter(n > 1) %>% pull(incident_name)
+
+# produce a data frame where `incident_name` matches all of those in `repeated_names`
+# since duplicated rows where already removed, this step is meant to discover why there are repeated names
+fires %>% filter(incident_name %in% repeated_names) %>% arrange(incident_name)
+```
+
+After analyzing the data for many observations that share the name `incident_name`, it appears that the reason for repeated names is simply due to the fact that the name was used more than once for an unrelated incident. Therefore, as far as I can tell at this point, no manipulations need to be made to this section.
+
+#### variable(s): `incident_county`
+
+```{r}
+# trim any white space
+fires$incident_county <- trimws(fires$incident_county)
+```
+
+```{r}
+fires %>% group_by(incident_county) %>% count() %>% arrange(desc(n))
+```
+
+#### variable(s): `incident_acres_burned`
+
+```{r}
+fires %>% group_by(incident_acres_burned) %>% count() %>% filter(incident_acres_burned < 1 | is.na(incident_acres_burned))
+```
+
+Acres burned is either zero (`0`) or `NA` for only a small proportion of the data set, which is insigificant in the grand scheme of things. Therefore, this variable does not require any manipulation, and will remain in the data frame, just in case.
+
+#### variable(s): `incident_containment`
+
+```{r}
+fires %>% group_by(incident_containment) %>% count() %>% arrange((desc(incident_containment)))
+```
+
+For the most part, incidents are nearly 100% contained. Only 22 observations do not have this information, but they're very insignificant when compared to those with this information available. Therefore, this variable does not require any manipulation, and will remain in the data frame, just in case.
+
+#### variable(s): `incident_longitude` and `incident_latitude`
+
+```{r}
+# find the value(s) of the observations whose longitude does not match the longitude pattern
+matchless_lons <- fires$incident_longitude[str_detect(fires$incident_longitude, "[-]?[0-9]{2,}\\.?[0-9]*", 
+                    negate = TRUE)]
+
+# find the value(s) of the observations whose latitude does not match the longitude pattern
+matchless_lats <- fires$incident_latitude[str_detect(fires$incident_latitude, "[-]?[0-9]{2,}\\.?[0-9]*", 
+                    negate = TRUE)]
+```
+
+```{r}
+# using the previous step, find the observation(s) whose longitude and/or latitude do not match the pattern
+matchless_fires <- fires %>% filter(incident_longitude %in% matchless_lons | incident_latitude %in% matchless_lats)
+matchless_fires
+```
+
+Out of the entire data set, the Pala Fire is the only observation whose longitude and/or latitude do not match the typical pattern. Since this is the only one, I decided to manually input the correct coordinates for this observation. 
+
+```{r}
+# since there's only one matchless fire, reassign it to the specific fire in question
+pala_fire <- matchless_fires
+
+# insert longitude and latitude of the Pala Fire
+pala_fire$incident_longitude <- -117.11794
+pala_fire$incident_latitude <- 33.36109
+
+# remove the old Pala Fire data from the data frame
+fires <- fires[!fires$incident_name == "Pala Fire",]
+
+# insert the new Pala Fire data into the data frame
+fires <- rbind(fires, pala_fire)
+
+# make sure the main data frame has the new Pala Fire data
+fires %>% filter(incident_name == "Pala Fire")
+```
+
 #### variable(s): `incident_dateonly_extinguished` and `incident_dateonly_created`
+
+The data is currently in YYYY-MM_DD, which can be difficult for analysis. Therefore, the data for both columns will be separated into individual columns that contain year, month, and day.
 
 ```{r}
 # note: there is >= 1 observation that does not have data in the `incident_dateonly_extinguished` column
@@ -116,34 +196,11 @@ fires$extinguished_year <- as.numeric(fires$extinguished_year)
 fires$created_year <- as.numeric(fires$created_year)
 ```
 
-#### variable(s): `incident_administrative_unit`
-
-```{r}
-# trim any white space
-fires$incident_administrative_unit <- trimws(fires$incident_administrative_unit)
-```
-
-#### variable(s): `incident_county`
-
-```{r}
-# trim any white space
-fires$incident_county <- trimws(fires$incident_county)
-```
-
-#### variable(s): `incident_cooperating_agencies`
-
-```{r}
-# trim any white space
-fires$incident_cooperating_agencies <- trimws(fires$incident_cooperating_agencies)
-```
-
 ```{r}
 str(fires)
 ```
 
-```{r}
-fires
-```
+
 
 
 
